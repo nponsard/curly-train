@@ -3,10 +3,9 @@ import * as readline from "node:readline/promises";
 import { SchemaRegistry } from "@kafkajs/confluent-schema-registry";
 import { stdin as input, stdout as output } from "node:process";
 import * as avro from "avsc";
-import { Schema } from "avsc/types";
 import { RawAvroSchema } from "@kafkajs/confluent-schema-registry/dist/@types";
 
-const schema: Schema = {
+const schema: RawAvroSchema = {
   type: "record",
   name: "Message",
   namespace: "do.polytech",
@@ -17,12 +16,15 @@ const type = avro.Type.forSchema(schema);
 
 const rl = readline.createInterface({ input, output });
 
-const brokers = process.env.KAFKA_BROKERS?.split(",") || ["kafka1:9092"];
+const brokers = process.env.KAFKA_BROKERS?.split(",") || [
+  "162.38.112.138:9092",
+];
 const clientId = process.env.KAFKA_CLIENT_ID || "stx";
 const groupId = process.env.KAFKA_GROUP_ID || "do-group";
 const topic = process.env.KAFKA_TOPIC || "do-avro";
 const username = process.env.KAFKA_USERNAME || "nilsp";
-const registryUrl = process.env.KAFKA_REGISTRY_URL || "http://registry:8081/";
+const registryUrl =
+  process.env.KAFKA_REGISTRY_URL || "http://162.38.112.138:8081/";
 
 const subject = "do.polytech.Message";
 
@@ -97,6 +99,10 @@ let schema_id = 0;
 async function send(message: string) {
   const buf = type.toBuffer({ message });
 
+  console.log("sending", message, "with schema id", schema_id);
+
+  console.log(buf);
+
   await producer.send({
     topic,
     messages: [
@@ -105,11 +111,23 @@ async function send(message: string) {
   });
 }
 
+let timeout : NodeJS.Timeout | null = null;
+
+function sendRandom() {
+  if (timeout) return;
+  timeout = setTimeout(async () => {
+    const random = Math.floor(Math.random() * words.length);
+    const word = words[random];
+
+    await send(word);
+
+    console.log(`Sent ${word}`);
+    timeout = null;
+  }, 1000);
+}
+
 async function run() {
-  schema_id = await registry.getRegistryIdBySchema(
-    subject,
-    schema as RawAvroSchema
-  );
+  schema_id = await registry.getRegistryIdBySchema(subject, schema);
 
   await consumer.connect();
   await producer.connect();
@@ -126,16 +144,9 @@ async function run() {
       const recieved_schema_id = message.headers?.schema_id?.toString();
 
       console.log(`${user} (${recieved_schema_id}): ${text}`);
-
-      setTimeout(async () => {
-        const random = Math.floor(Math.random() * words.length);
-        const word = words[random];
-
-        await send(word);
-
-        console.log(`Sent ${word}`);
-      }, 1000);
-    },
+      sendRandom();
+     
+    }, 
   });
 
   console.log("Initialized");
