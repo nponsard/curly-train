@@ -1,18 +1,32 @@
 import { Kafka, Partitioners } from "kafkajs";
 import * as readline from "node:readline/promises";
-
+import { SchemaRegistry } from "@kafkajs/confluent-schema-registry";
 import { stdin as input, stdout as output } from "node:process";
+import * as avro from "avsc";
+import { Schema } from "avsc/types";
+import { RawAvroSchema } from "@kafkajs/confluent-schema-registry/dist/@types";
+
+const schema: Schema = {
+  type: "record",
+  name: "Message",
+  namespace: "do.polytech",
+  fields: [{ name: "message", type: "string" }],
+};
+
+const type = avro.Type.forSchema(schema);
 
 const rl = readline.createInterface({ input, output });
-
-const channel = new MessageChannel();
-const port1 = channel.port1;
 
 const brokers = process.env.KAFKA_BROKERS?.split(",") || ["kafka1:9092"];
 const clientId = process.env.KAFKA_CLIENT_ID || "stx";
 const groupId = process.env.KAFKA_GROUP_ID || "do-group";
-const topic = process.env.KAFKA_TOPIC || "do";
+const topic = process.env.KAFKA_TOPIC || "do-avro";
 const username = process.env.KAFKA_USERNAME || "nilsp";
+const registryUrl = process.env.KAFKA_REGISTRY_URL || "http://registry:8081/";
+
+const subject = "do.polytech.Message";
+
+const registry = new SchemaRegistry({ host: registryUrl });
 
 const kafka = new Kafka({
   brokers,
@@ -79,7 +93,24 @@ const words = [
 
 console.log(brokers);
 
+let schema_id = 0;
+async function send(message: string) {
+  const buf = type.toBuffer({ message });
+
+  await producer.send({
+    topic,
+    messages: [
+      { value: buf, headers: { username, schema_id: `${schema_id}` } },
+    ],
+  });
+}
+
 async function run() {
+  schema_id = await registry.getRegistryIdBySchema(
+    subject,
+    schema as RawAvroSchema
+  );
+
   await consumer.connect();
   await producer.connect();
 
@@ -88,18 +119,19 @@ async function run() {
   console.log("Consumer is running");
   await consumer.run({
     eachMessage: async ({ topic, partition, message }) => {
-      const text = message.value?.toString();
-      const user = message.headers?.username?.toString();
+      if (message.value === null) return;
 
-      console.log(`${user}: ${text}`);
+      const text = type.fromBuffer(message.value)?.message?.toString();
+      const user = message.headers?.username?.toString();
+      const recieved_schema_id = message.headers?.schema_id?.toString();
+
+      console.log(`${user} (${recieved_schema_id}): ${text}`);
 
       setTimeout(async () => {
         const random = Math.floor(Math.random() * words.length);
         const word = words[random];
-        await producer.send({
-          topic,
-          messages: [{ value: word, headers: { username } }],
-        });
+
+        await send(word);
 
         console.log(`Sent ${word}`);
       }, 1000);
@@ -111,10 +143,7 @@ async function run() {
   while (true) {
     const answer = await rl.question("");
 
-    await producer.send({
-      topic,
-      messages: [{ value: answer, headers: { username } }],
-    });
+    await send(answer);
   }
 }
 
