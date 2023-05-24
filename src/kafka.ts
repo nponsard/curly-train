@@ -1,5 +1,5 @@
 import { SchemaRegistry } from "@kafkajs/confluent-schema-registry";
-import { schema } from "./schema";
+import { Message, schema } from "./schema";
 import * as avro from "avsc";
 import { Kafka, Partitioners } from "kafkajs";
 import { sendRandom } from "./random";
@@ -14,7 +14,7 @@ const username = process.env.KAFKA_USERNAME || "nilsp";
 const registryUrl =
   process.env.KAFKA_REGISTRY_URL || "http://162.38.112.138:8081/";
 
-const subject = "do-avro-std-value";
+const subject = "do.polytech.Message";
 
 const registry = new SchemaRegistry({ host: registryUrl });
 
@@ -32,13 +32,11 @@ console.log(brokers);
 
 const type = avro.Type.forSchema(schema);
 let schema_id = 0;
-export async function send(message: string) {
-  const buf = type.toBuffer({ message });
 
-  console.log("sending", message, "with schema id", schema_id);
+export async function send(content: Message) {
+  const buf = type.toBuffer(content);
 
-  console.log(buf);
-
+  console.log("sending", content.message, "with schema id", schema_id);
   await producer.send({
     topic,
     messages: [
@@ -60,9 +58,10 @@ export async function init() {
     eachMessage: async ({ topic, partition, message }) => {
       if (message.value === null) return;
 
-      const text = type.fromBuffer(message.value)?.message?.toString();
       const user = message.headers?.username?.toString();
       const recieved_schema_id = message.headers?.schema_id?.toString();
+
+      const text = JSON.stringify(type.fromBuffer(message.value));
 
       console.log(`${user} (${recieved_schema_id}): ${text}`);
       sendRandom();

@@ -1,6 +1,7 @@
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { send, close, init } from "./kafka";
+import { close, init } from "./kafka";
+import { sendRandom } from "./random";
 const rl = readline.createInterface({ input, output });
 
 async function run() {
@@ -8,7 +9,7 @@ async function run() {
   while (true) {
     const answer = await rl.question("");
 
-    await send(answer);
+    sendRandom(answer);
   }
 }
 

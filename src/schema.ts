@@ -14,3 +14,15 @@ export const schema: RawAvroSchema = {
     { name: "long", type: "double" },
   ],
 };
+
+
+export interface Message {
+  message: string;
+  country: string;
+  city: string;
+  temperature: number;
+  random: number;
+  lat: number;
+  long: number;
+}
+
