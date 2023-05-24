@@ -3,14 +3,8 @@ import * as readline from "node:readline/promises";
 import { SchemaRegistry } from "@kafkajs/confluent-schema-registry";
 import { stdin as input, stdout as output } from "node:process";
 import * as avro from "avsc";
-import { RawAvroSchema } from "@kafkajs/confluent-schema-registry/dist/@types";
-
-const schema: RawAvroSchema = {
-  type: "record",
-  name: "Message",
-  namespace: "do.polytech",
-  fields: [{ name: "message", type: "string" }],
-};
+import { schema } from "./schema";
+import { words } from "./words";
 
 const type = avro.Type.forSchema(schema);
 
@@ -40,59 +34,6 @@ const producer = kafka.producer({
   createPartitioner: Partitioners.DefaultPartitioner,
 });
 
-// french words
-const words = [
-  "le",
-  "la",
-  "de",
-  "un",
-  "à",
-  "être",
-  "et",
-  "en",
-  "avoir",
-  "que",
-  "pour",
-  "dans",
-  "ce",
-  "il",
-  "qui",
-  "ne",
-  "sur",
-  "se",
-  "pas",
-  "plus",
-  "pouvoir",
-  "par",
-  "je",
-  "avec",
-  "tout",
-  "faire",
-  "son",
-  "mettre",
-  "autre",
-  "nous",
-  "mais",
-  "on",
-  "ou",
-  "si",
-  "me",
-  "manquer",
-  "dire",
-  "vous",
-  "ici",
-  "rien",
-  "devoir",
-  "aussi",
-  "leur",
-  "y",
-  "prendre",
-  "bien",
-  "où",
-  "même",
-  "donner",
-];
-
 console.log(brokers);
 
 let schema_id = 0;
@@ -111,10 +52,10 @@ async function send(message: string) {
   });
 }
 
-let timeout : NodeJS.Timeout | null = null;
+let timeout: NodeJS.Timeout | null = null;
 
 function sendRandom() {
-  if (timeout) return;
+  // if (timeout) return;
   timeout = setTimeout(async () => {
     const random = Math.floor(Math.random() * words.length);
     const word = words[random];
@@ -145,8 +86,7 @@ async function run() {
 
       console.log(`${user} (${recieved_schema_id}): ${text}`);
       sendRandom();
-     
-    }, 
+    },
   });
 
   console.log("Initialized");
@@ -160,5 +100,5 @@ async function run() {
 
 run().catch(console.error);
 
-consumer.disconnect();
-producer.disconnect();
+consumer.disconnect().catch(console.error);
+producer.disconnect().catch(console.error);
