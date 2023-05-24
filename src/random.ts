@@ -28,7 +28,6 @@ export function sendRandom(message?: string) {
 
     await send(content);
 
-    console.log(`Sent ${message}`);
     timeout = null;
   }, 1000);
 }

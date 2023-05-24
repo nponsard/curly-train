@@ -36,7 +36,7 @@ let schema_id = 0;
 export async function send(content: Message) {
   const buf = type.toBuffer(content);
 
-  console.log("sending", content.message, "with schema id", schema_id);
+  console.log("sending", JSON.stringify(content), "with schema id", schema_id);
   await producer.send({
     topic,
     messages: [
